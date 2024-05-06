@@ -129,12 +129,12 @@ Z
 
 
 
-X <- c( 34,56,22,11,65,45)
-Y <- mean(X)
-Z <- min(X)
-W <- max(X)
-S <- sum(X)
-V <- prod(X)
+WW <- c( 34,56,22,11,65,45)
+Y <- mean(WW)
+Z <- min(WW)
+W <- max(WW)
+S <- sum(WW)
+V <- prod(WW)
 X
 Y
 Z
