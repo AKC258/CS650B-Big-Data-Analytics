@@ -1,99 +1,90 @@
-# Load required libraries
+# Install and load the required packages if not already installed
+if (!require("readr")) {
+  install.packages("readr")
+  library(readr)
+}
+
 if (!require("ggplot2")) {
   install.packages("ggplot2")
   library(ggplot2)
 }
 
-# Read the CSV file using the full path
-data <- read.csv("LondonBikeJourneyAug2023.csv")
-
-# Display the data
-print(data)
-
-# Display column names to check what they are
-cat("Column names in the dataset:\n")
-print(names(data))
-
-# Number of rows
-cat("Number of rows: ", nrow(data), "\n")
-
-# Number of columns
-cat("Number of columns: ", ncol(data), "\n")
-
-# First 6 rows
-cat("First 6 rows:\n")
-print(head(data))
-
-# Last 6 rows
-cat("Last 6 rows:\n")
-print(tail(data))
-
-# Structure of the data
-cat("Structure of the data:\n")
-str(data)
-
-# Summary of the data
-cat("Summary of the data:\n")
-print(summary(data))
-
-# Check for and handle missing values
-numberOfNA <- sum(is.na(data))
-if (numberOfNA > 0) {
-  cat('Number of missing values found: ', numberOfNA, '\n')
-  cat('Removing missing values...\n')
-  data <- na.omit(data)
-  cat('Data after removing missing values:\n')
-  print(data)
+if (!require("dplyr")) {
+  install.packages("dplyr")
+  library(dplyr)
 }
+# Set the correct path to your CSV file
+file_path <- "C:/Users/chipp/Downloads/insurance.csv"  # Use forward slashes or double backslashes
+# Alternatively: file_path <- "C:\\Users\\chipp\\Downloads\\insurance.csv"
+# Read the dataset using readr
+insurance_data <- read_csv(file_path)
 
-# Assuming you identified the correct column names for 'x' and 'y'
-# Replace 'Start.station.number' and 'End.station.number' with the actual column names
-x_column <- "Start.station.number" # replace with actual column name
-y_column <- "End.station.number" # replace with actual column name
+# Display the first few rows of the dataset
+head(insurance_data)
 
-# Convert y_column to a factor if it's not already binary
-data[[y_column]] <- as.factor(data[[y_column]])
+# Display the structure of the dataset
+str(insurance_data)
 
-# Verify if the columns exist
-if (!all(c(x_column, y_column) %in% names(data))) {
-  stop(paste("Columns", x_column, "and", y_column, "must exist in the data."))
-}
+# Summary of the dataset
+summary(insurance_data)
 
-# Check if data is not empty after removing NAs
-if (nrow(data) == 0) {
-  stop("No data available after removing missing values.")
-}
+# Linear Regression: Predicting charges based on other variables
+linear_model <- lm(charges ~ age + bmi + children + smoker + region, data = insurance_data)
 
-# Define the structure of the plotting area
-par(mfrow = c(1, 2))
+# Summary of the linear regression model
+summary(linear_model)
 
-# Boxplot for X
-boxplot(data[[x_column]], main = 'X', sub = paste('Outliers: ', paste(boxplot.stats(data[[x_column]])$out, collapse = ", ")))
+# Add predicted values to the dataset
+insurance_data$predicted_charges <- predict(linear_model, insurance_data)
 
-# Boxplot for Y
-boxplot(data[[y_column]], main = 'Y', sub = paste('Outliers: ', paste(boxplot.stats(data[[y_column]])$out, collapse = ", ")))
+# Plot actual vs predicted charges
+ggplot(insurance_data, aes(x = charges, y = predicted_charges)) +
+  geom_point(color = 'blue') +
+  geom_smooth(method = 'lm', se = FALSE, color = 'red') +
+  ggtitle("Actual vs Predicted Insurance Charges (Linear Regression)") +
+  xlab("Actual Charges") +
+  ylab("Predicted Charges") +
+  theme_minimal()
+# Polynomial Regression: Adding a polynomial term for age
+insurance_data <- insurance_data %>%
+  mutate(age_sq = age^2)
 
-# Summary of X and Y
-cat("Summary of X and Y:\n")
-summary(data[c(x_column, y_column)])
+# Perform polynomial regression
+polynomial_model <- lm(charges ~ age + age_sq + bmi + children + smoker + region, data = insurance_data)
 
-# Logistic regression model
-regressor <- glm(as.formula(paste(y_column, "~", x_column)), data = data, family = binomial)
+# Summary of the polynomial regression model
+summary(polynomial_model)
+
+# Add predicted values to the dataset
+insurance_data$predicted_charges_poly <- predict(polynomial_model, insurance_data)
+
+# Plot actual vs predicted charges for polynomial regression
+ggplot(insurance_data, aes(x = charges, y = predicted_charges_poly)) +
+  geom_point(color = 'blue') +
+  geom_smooth(method = 'lm', se = FALSE, color = 'red') +
+  ggtitle("Actual vs Predicted Insurance Charges (Polynomial Regression)") +
+  xlab("Actual Charges") +
+  ylab("Predicted Charges") +
+  theme_minimal()
+# Logistic Regression: Creating a binary target variable (charges > median)
+insurance_data <- insurance_data %>%
+  mutate(expensive = ifelse(charges > median(charges), 1, 0))
+
+# Perform logistic regression
+logistic_model <- glm(expensive ~ age + bmi + children + smoker + region, 
+                      data = insurance_data, family = binomial)
 
 # Summary of the logistic regression model
-cat("Summary of the logistic regression model:\n")
-print(summary(regressor))
+summary(logistic_model)
 
-# Predict probabilities
-data$predicted_prob <- predict(regressor, type = "response")
+# Add the predicted probabilities to the dataset
+insurance_data$predicted_prob <- predict(logistic_model, insurance_data, type = "response")
 
-# Plotting using ggplot2 with tidy evaluation
-# Plotting using ggplot2 with tidy evaluation
-ggplot(data, aes(x = .data[[x_column]], y = as.numeric(.data[[y_column]]) - 1)) +  # Convert factor to numeric for plotting
-  geom_point(aes(color = .data[[y_column]]), size = 2) +
-  geom_smooth(method = "glm", method.args = list(family = binomial), formula = y ~ x, se = FALSE, color = 'blue') +
-  ggtitle(paste(x_column, 'vs', y_column, '(Logistic Regression)')) +
-  xlab(x_column) +
-  ylab(y_column) +
-  theme_minimal()
-
+# Plot the predicted probabilities
+ggplot(insurance_data, aes(x = predicted_prob, fill = as.factor(expensive))) +
+  geom_histogram(binwidth = 0.05, alpha = 0.6, position = 'identity') +
+  ggtitle("Predicted Probabilities for Expensive Insurance Charges (Logistic Regression)") +
+  xlab("Predicted Probability") +
+  ylab("Count") +
+  theme_minimal() +
+  scale_fill_discrete(name = "Expensive", labels = c("No", "Yes"))
